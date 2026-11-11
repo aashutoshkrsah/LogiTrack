@@ -1,0 +1,303 @@
+{
+  "info": {
+    "_postman_id": "a6f72c31-9c2d-4d62-92be-logistics-tracking-v1",
+    "name": "Logistics Shipment & Delivery Tracking System API",
+    "description": "Complete REST API collection covering Customers, Drivers, Hubs, Shipments, Tracking Events, Timelines, Dashboard, and Business Rule validation scenarios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Dashboard",
+      "item": [
+        {
+          "name": "GET Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/dashboard/summary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Customers",
+      "item": [
+        {
+          "name": "GET All Customers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/customers"
+          }
+        },
+        {
+          "name": "GET Customer By ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/customers/1"
+          }
+        },
+        {
+          "name": "POST Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerCode\": \"CUST-1099\",\n  \"name\": \"Western Freight Logistics\",\n  \"phone\": \"+91-98201-99099\",\n  \"email\": \"ops@westernfreight.example.com\",\n  \"customerType\": \"CORPORATE\"\n}"
+            },
+            "url": "{{baseUrl}}/customers"
+          }
+        },
+        {
+          "name": "PUT Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerCode\": \"CUST-1099\",\n  \"name\": \"Western Freight Logistics Pvt Ltd\",\n  \"phone\": \"+91-98201-99099\",\n  \"email\": \"dispatch@westernfreight.example.com\",\n  \"customerType\": \"CORPORATE\"\n}"
+            },
+            "url": "{{baseUrl}}/customers/6"
+          }
+        },
+        {
+          "name": "DELETE Customer",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/customers/6"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Drivers",
+      "item": [
+        {
+          "name": "GET All Drivers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/drivers"
+          }
+        },
+        {
+          "name": "POST Create Driver",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverCode\": \"DRV-2099\",\n  \"fullName\": \"Vikram Singh Rathore\",\n  \"phone\": \"+91-98220-99099\",\n  \"licenceNumber\": \"RJ14-20200088991\",\n  \"availabilityStatus\": \"AVAILABLE\"\n}"
+            },
+            "url": "{{baseUrl}}/drivers"
+          }
+        },
+        {
+          "name": "PATCH Update Driver Availability",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"INACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/drivers/1/availability"
+          }
+        },
+        {
+          "name": "DELETE Driver",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/drivers/6"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Hubs",
+      "item": [
+        {
+          "name": "GET All Hubs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/hubs"
+          }
+        },
+        {
+          "name": "POST Create Hub",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hubCode\": \"HUB-AMD-06\",\n  \"hubName\": \"Ahmedabad Cargo Gateway\",\n  \"city\": \"Ahmedabad\",\n  \"address\": \"Plot 77, Sanand Logistics Zone, Ahmedabad 382110\",\n  \"contactNumber\": \"+91-79-4006-6000\"\n}"
+            },
+            "url": "{{baseUrl}}/hubs"
+          }
+        },
+        {
+          "name": "PUT Update Hub",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hubCode\": \"HUB-AMD-06\",\n  \"hubName\": \"Ahmedabad Express Hub\",\n  \"city\": \"Ahmedabad\",\n  \"address\": \"Plot 77, Sanand Logistics Zone, Ahmedabad 382110\",\n  \"contactNumber\": \"+91-79-4006-6099\"\n}"
+            },
+            "url": "{{baseUrl}}/hubs/6"
+          }
+        },
+        {
+          "name": "DELETE Hub",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/hubs/6"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Shipments",
+      "item": [
+        {
+          "name": "GET All Shipments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/shipments"
+          }
+        },
+        {
+          "name": "GET Overdue Shipments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/shipments?delayedOnly=true"
+          }
+        },
+        {
+          "name": "GET Shipment Timeline By Tracking Number",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/shipments/TRK-2026-0001/timeline"
+          }
+        },
+        {
+          "name": "POST Create Shipment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trackingNumber\": \"TRK-2026-9901\",\n  \"customerId\": 1,\n  \"driverId\": 2,\n  \"originHubId\": 1,\n  \"destinationAddress\": \"15 MG Road, Camp\",\n  \"destinationCity\": \"Pune\",\n  \"createdDate\": \"2026-11-11\",\n  \"expectedDeliveryDate\": \"2026-11-15\",\n  \"shipmentStatus\": \"PENDING\",\n  \"weight\": 34.75\n}"
+            },
+            "url": "{{baseUrl}}/shipments"
+          }
+        },
+        {
+          "name": "PUT Update Shipment & Driver",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trackingNumber\": \"TRK-2026-9901\",\n  \"customerId\": 1,\n  \"driverId\": 4,\n  \"originHubId\": 1,\n  \"destinationAddress\": \"15 MG Road, Camp\",\n  \"destinationCity\": \"Pune\",\n  \"createdDate\": \"2026-11-11\",\n  \"expectedDeliveryDate\": \"2026-11-16\",\n  \"shipmentStatus\": \"PENDING\",\n  \"weight\": 35.00\n}"
+            },
+            "url": "{{baseUrl}}/shipments/8"
+          }
+        },
+        {
+          "name": "DELETE Shipment (Allowed if no tracking events)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/shipments/5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Tracking Events",
+      "item": [
+        {
+          "name": "GET All Tracking Events",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/tracking-events"
+          }
+        },
+        {
+          "name": "POST Append Tracking Event (Pickup)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": 4,\n  \"eventDateTime\": \"2026-11-11T16:30:00\",\n  \"eventStatus\": \"IN_TRANSIT\",\n  \"hubId\": 2,\n  \"remarks\": \"Departed Bengaluru Hub toward Chennai\",\n  \"updatedBy\": \"Hub Lead D. Gowda\"\n}"
+            },
+            "url": "{{baseUrl}}/tracking-events"
+          }
+        },
+        {
+          "name": "PUT Correct Tracking Event (Requires Remarks)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": 4,\n  \"eventDateTime\": \"2026-11-11T16:35:00\",\n  \"eventStatus\": \"IN_TRANSIT\",\n  \"hubId\": 2,\n  \"remarks\": \"Corrected departure timestamp per dispatch log\",\n  \"updatedBy\": \"Supervisor R. Iyer\"\n}"
+            },
+            "url": "{{baseUrl}}/tracking-events/14"
+          }
+        },
+        {
+          "name": "DELETE Latest Tracking Event",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/tracking-events/14"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Negative Validation & Business Rule Tests",
+      "item": [
+        {
+          "name": "POST Duplicate Tracking Number (Expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trackingNumber\": \"TRK-2026-0001\",\n  \"customerId\": 1,\n  \"originHubId\": 1,\n  \"destinationAddress\": \"Plot 19, Hinjewadi Phase 2\",\n  \"destinationCity\": \"Pune\",\n  \"createdDate\": \"2026-11-11\",\n  \"expectedDeliveryDate\": \"2026-11-15\",\n  \"weight\": 10.00\n}"
+            },
+            "url": "{{baseUrl}}/shipments"
+          }
+        },
+        {
+          "name": "POST Invalid Expected Date (Expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trackingNumber\": \"TRK-BAD-DATE\",\n  \"customerId\": 1,\n  \"originHubId\": 1,\n  \"destinationAddress\": \"Plot 19, Hinjewadi Phase 2\",\n  \"destinationCity\": \"Pune\",\n  \"createdDate\": \"2026-11-11\",\n  \"expectedDeliveryDate\": \"2026-11-05\",\n  \"weight\": 10.00\n}"
+            },
+            "url": "{{baseUrl}}/shipments"
+          }
+        },
+        {
+          "name": "DELETE Shipment With Tracking History (Expect 409)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/shipments/1"
+          }
+        }
+      ]
+    }
+  ]
+}
+

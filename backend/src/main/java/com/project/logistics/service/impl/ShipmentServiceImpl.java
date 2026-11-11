@@ -1,5 +1,6 @@
 package com.project.logistics.service.impl;
 
+import com.project.logistics.dto.PageResponse;
 import com.project.logistics.dto.ShipmentRequest;
 import com.project.logistics.dto.ShipmentResponse;
 import com.project.logistics.dto.ShipmentTimelineResponse;
@@ -21,7 +22,12 @@ import com.project.logistics.repository.ShipmentRepository;
 import com.project.logistics.repository.TrackingEventRepository;
 import com.project.logistics.service.ShipmentService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +75,137 @@ public class ShipmentServiceImpl implements ShipmentService {
                 .map(s -> DtoMapper.toShipmentResponse(
                         s, trackingEventRepository.countByShipmentShipmentId(s.getShipmentId())))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ShipmentResponse> getShipmentsPaged(String trackingNumber,
+                                                            ShipmentStatus status,
+                                                            LocalDate fromDate,
+                                                            LocalDate toDate,
+                                                            Long customerId,
+                                                            Long driverId,
+                                                            Long originHubId,
+                                                            boolean delayedOnly,
+                                                            Pageable pageable) {
+        if (fromDate != null && toDate != null && toDate.isBefore(fromDate)) {
+            throw new BusinessRuleException("Filter 'toDate' cannot be before 'fromDate'.", HttpStatus.BAD_REQUEST);
+        }
+        String normalizedTracking = trackingNumber == null ? null : trackingNumber.trim();
+        org.springframework.data.domain.Page<Shipment> page = shipmentRepository.searchShipmentsPaged(
+                normalizedTracking, status, fromDate, toDate, customerId, driverId, originHubId,
+                delayedOnly, LocalDate.now(), pageable);
+        List<ShipmentResponse> content = page.getContent().stream()
+                .map(s -> DtoMapper.toShipmentResponse(
+                        s, trackingEventRepository.countByShipmentShipmentId(s.getShipmentId())))
+                .toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages());
+    }
+
+    @Override
+    public ShipmentResponse assignDriver(Long id, Long driverId) {
+        Shipment shipment = findShipmentWithDetailsOrThrow(id);
+        if (shipment.getShipmentStatus() == ShipmentStatus.DELIVERED
+                || shipment.getShipmentStatus() == ShipmentStatus.CANCELLED) {
+            throw new BusinessRuleException(
+                    "Cannot assign a driver to a " + shipment.getShipmentStatus().name().toLowerCase()
+                            + " shipment.", HttpStatus.CONFLICT);
+        }
+        Driver driver = resolveDriver(driverId, shipment.getDriver() != null
+                ? shipment.getDriver().getDriverId() : null);
+        shipment.setDriver(driver);
+        Shipment saved = shipmentRepository.save(shipment);
+        long eventCount = trackingEventRepository.countByShipmentShipmentId(id);
+        return DtoMapper.toShipmentResponse(saved, eventCount);
+    }
+
+    @Override
+    public ShipmentResponse advanceStatus(Long id) {
+        Shipment shipment = findShipmentWithDetailsOrThrow(id);
+        ShipmentStatus next = nextStatus(shipment.getShipmentStatus());
+        if (next == null) {
+            throw new BusinessRuleException(
+                    "Shipment is " + shipment.getShipmentStatus().name()
+                            + " and cannot be advanced further.", HttpStatus.CONFLICT);
+        }
+        appendEvent(shipment, next, "Advanced to " + next.name() + " via one-click workflow.");
+        shipment.setShipmentStatus(next);
+        Shipment saved = shipmentRepository.save(shipment);
+        long eventCount = trackingEventRepository.countByShipmentShipmentId(id);
+        return DtoMapper.toShipmentResponse(saved, eventCount);
+    }
+
+    @Override
+    public ShipmentResponse cancelShipment(Long id, String reason) {
+        Shipment shipment = findShipmentWithDetailsOrThrow(id);
+        if (shipment.getShipmentStatus() == ShipmentStatus.DELIVERED) {
+            throw new BusinessRuleException("A delivered shipment cannot be cancelled.", HttpStatus.CONFLICT);
+        }
+        if (shipment.getShipmentStatus() == ShipmentStatus.CANCELLED) {
+            throw new BusinessRuleException("Shipment is already cancelled.", HttpStatus.CONFLICT);
+        }
+        String remarks = (reason == null || reason.isBlank())
+                ? "Cancelled via workflow." : "Cancelled: " + reason.trim();
+        appendEvent(shipment, ShipmentStatus.CANCELLED, remarks);
+        shipment.setShipmentStatus(ShipmentStatus.CANCELLED);
+        Shipment saved = shipmentRepository.save(shipment);
+        long eventCount = trackingEventRepository.countByShipmentShipmentId(id);
+        return DtoMapper.toShipmentResponse(saved, eventCount);
+    }
+
+    @Override
+    public ShipmentResponse deliverShipment(Long id, String receivedBy, String remarks) {
+        Shipment shipment = findShipmentWithDetailsOrThrow(id);
+        if (shipment.getShipmentStatus() != ShipmentStatus.OUT_FOR_DELIVERY) {
+            throw new BusinessRuleException(
+                    "Only a shipment OUT_FOR_DELIVERY can be marked delivered. Current status: "
+                            + shipment.getShipmentStatus().name()
+                            + ". Use Advance to move it forward first.", HttpStatus.CONFLICT);
+        }
+        String pod = "Delivered. Proof of delivery — received by: " + receivedBy.trim()
+                + (remarks == null || remarks.isBlank() ? "" : ". " + remarks.trim());
+        appendEvent(shipment, ShipmentStatus.DELIVERED, pod);
+        shipment.setShipmentStatus(ShipmentStatus.DELIVERED);
+        Shipment saved = shipmentRepository.save(shipment);
+        long eventCount = trackingEventRepository.countByShipmentShipmentId(id);
+        return DtoMapper.toShipmentResponse(saved, eventCount);
+    }
+
+    private static ShipmentStatus nextStatus(ShipmentStatus current) {
+        return Map.of(
+                ShipmentStatus.PENDING, ShipmentStatus.PICKED_UP,
+                ShipmentStatus.PICKED_UP, ShipmentStatus.IN_TRANSIT,
+                ShipmentStatus.IN_TRANSIT, ShipmentStatus.OUT_FOR_DELIVERY,
+                ShipmentStatus.OUT_FOR_DELIVERY, ShipmentStatus.DELIVERED
+        ).get(current);
+    }
+
+    private void appendEvent(Shipment shipment, ShipmentStatus status, String remarks) {
+        TrackingEvent event = new TrackingEvent();
+        event.setShipment(shipment);
+        event.setEventDateTime(LocalDateTime.now().withNano(0));
+        event.setEventStatus(status);
+        event.setHub(shipment.getOriginHub());
+        event.setRemarks(remarks);
+        event.setUpdatedBy(currentUsername());
+        trackingEventRepository.save(event);
+    }
+
+    private static String currentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return "System";
+        }
+        Object principal = auth.getPrincipal();
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
+            return userDetails.getUsername();
+        }
+        if (principal instanceof String name && !"anonymousUser".equals(name)) {
+            return name;
+        }
+        String name = auth.getName();
+        return (name == null || name.isBlank() || "anonymousUser".equals(name)) ? "System" : name;
     }
 
     @Override

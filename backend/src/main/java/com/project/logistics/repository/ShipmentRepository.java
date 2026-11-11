@@ -5,6 +5,8 @@ import com.project.logistics.entity.ShipmentStatus;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -78,6 +80,44 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
                                    @Param("originHubId") Long originHubId,
                                    @Param("delayedOnly") boolean delayedOnly,
                                    @Param("today") LocalDate today);
+
+    @Query("""
+        SELECT s FROM Shipment s
+        JOIN FETCH s.customer c
+        JOIN FETCH s.originHub h
+        LEFT JOIN FETCH s.driver d
+        WHERE (:trackingNumber IS NULL OR :trackingNumber = ''
+               OR LOWER(s.trackingNumber) LIKE LOWER(CONCAT('%', :trackingNumber, '%'))
+               OR LOWER(s.destinationCity) LIKE LOWER(CONCAT('%', :trackingNumber, '%'))
+               OR LOWER(c.name) LIKE LOWER(CONCAT('%', :trackingNumber, '%')))
+          AND (:status IS NULL OR s.shipmentStatus = :status)
+          AND (:fromDate IS NULL OR s.createdDate >= :fromDate)
+          AND (:toDate IS NULL OR s.createdDate <= :toDate)
+          AND (:customerId IS NULL OR c.customerId = :customerId)
+          AND (:driverId IS NULL OR (d IS NOT NULL AND d.driverId = :driverId))
+          AND (:originHubId IS NULL OR h.hubId = :originHubId)
+          AND (:delayedOnly = FALSE OR (s.expectedDeliveryDate < :today
+               AND s.shipmentStatus <> com.project.logistics.entity.ShipmentStatus.DELIVERED
+               AND s.shipmentStatus <> com.project.logistics.entity.ShipmentStatus.CANCELLED))
+    """)
+    Page<Shipment> searchShipmentsPaged(@Param("trackingNumber") String trackingNumber,
+                                        @Param("status") ShipmentStatus status,
+                                        @Param("fromDate") LocalDate fromDate,
+                                        @Param("toDate") LocalDate toDate,
+                                        @Param("customerId") Long customerId,
+                                        @Param("driverId") Long driverId,
+                                        @Param("originHubId") Long originHubId,
+                                        @Param("delayedOnly") boolean delayedOnly,
+                                        @Param("today") LocalDate today,
+                                        Pageable pageable);
+
+    List<Shipment> findByCreatedDateBetween(LocalDate from, LocalDate to);
+
+    @Query("SELECT h.hubCode, h.hubName, h.city, COUNT(s) FROM Shipment s JOIN s.originHub h GROUP BY h.hubCode, h.hubName, h.city ORDER BY COUNT(s) DESC")
+    List<Object[]> hubThroughput();
+
+    @Query("SELECT d.driverCode, d.fullName, COUNT(s) FROM Shipment s JOIN s.driver d WHERE s.shipmentStatus = com.project.logistics.entity.ShipmentStatus.DELIVERED GROUP BY d.driverCode, d.fullName ORDER BY COUNT(s) DESC")
+    List<Object[]> deliveredCountByDriver();
 
     @Query("""
         SELECT s FROM Shipment s

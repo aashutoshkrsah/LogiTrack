@@ -1,7 +1,8 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { PageResponse, normalizePage } from '../models/page.model';
 import { MessageResponse } from '../models/dashboard.model';
 import { AvailabilityStatus, DriverRequest, DriverResponse } from '../models/driver.model';
 
@@ -40,5 +41,20 @@ export class DriverService {
   delete(id: number): Observable<MessageResponse> {
     return this.http.delete<MessageResponse>(`${this.baseUrl}/${id}`);
   }
-}
 
+  getPaged(page: number, size: number, search?: string, availabilityStatus?: AvailabilityStatus | ''): Observable<PageResponse<DriverResponse>> {
+    let params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+    if (search && search.trim()) params = params.set('search', search.trim());
+    if (availabilityStatus) params = params.set('availabilityStatus', availabilityStatus);
+    return this.http.get<DriverResponse[] | PageResponse<DriverResponse>>(this.baseUrl, { params })
+      .pipe(map((res) => normalizePage(res)));
+  }
+
+  exportCsv(search?: string, availabilityStatus?: AvailabilityStatus | ''): Observable<Blob> {
+    let params = new HttpParams();
+    if (search && search.trim()) params = params.set('search', search.trim());
+    if (availabilityStatus) params = params.set('availabilityStatus', availabilityStatus);
+    return this.http.get(`${this.baseUrl}/export`, { params, responseType: 'blob' });
+  }
+
+}

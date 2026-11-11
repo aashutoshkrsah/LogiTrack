@@ -5,9 +5,13 @@ import { RouterLink } from '@angular/router';
 import { CustomerResponse, CustomerType } from '../../../models/customer.model';
 import { CustomerService } from '../../../services/customer.service';
 import { NotificationService } from '../../../services/notification.service';
+import { ExportService } from '../../../services/export.service';
+import { SettingsService } from '../../../services/settings.service';
+import { PageResponse } from '../../../models/page.model';
 import {
   ConfirmDialogComponent,
   DataTableComponent,
+  PaginationComponent,
   SearchFilterBarComponent,
   StatusBadgeComponent
 } from '../../../shared/shared-ui';
@@ -22,7 +26,8 @@ import {
     DataTableComponent,
     SearchFilterBarComponent,
     StatusBadgeComponent,
-    ConfirmDialogComponent
+    ConfirmDialogComponent,
+    PaginationComponent
   ],
   template: `
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
@@ -30,20 +35,25 @@ import {
         <h1 class="page-title">Customer Directory</h1>
         <p class="page-subtitle">Manage shippers, corporate accounts, and retail consignors</p>
       </div>
-      <a routerLink="/customers/new" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>Add Customer
-      </a>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportCsv()" [disabled]="loading">
+          <i class="bi bi-download me-1"></i>Export CSV
+        </button>
+        <a routerLink="/customers/new" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>Add Customer
+        </a>
+      </div>
     </div>
 
     <app-search-filter-bar
       searchLabel="Search Customers"
       placeholder="Search by code, name, email, or phone..."
       [(searchTerm)]="searchTerm"
-      (searchSubmit)="loadCustomers()"
+      (searchSubmit)="onFilterChange()"
       (resetFilters)="onReset()">
       <div class="col-12 col-md-3">
         <label class="form-label small text-muted mb-1">Customer Type</label>
-        <select class="form-select form-select-sm" [(ngModel)]="selectedType" (change)="loadCustomers()">
+        <select class="form-select form-select-sm" [(ngModel)]="selectedType" (change)="onFilterChange()">
           <option value="">All Types</option>
           <option value="CORPORATE">Corporate</option>
           <option value="ECOMMERCE">E-Commerce</option>
@@ -53,9 +63,16 @@ import {
       </div>
     </app-search-filter-bar>
 
+    @if (loading) {
+      <div class="ops-card p-3">
+        <div class="skeleton skeleton-row" style="width: 30%;"></div>
+        <div class="skeleton skeleton-row" style="width: 95%;"></div>
+        <div class="skeleton skeleton-row" style="width: 85%;"></div>
+      </div>
+    } @else {
     <app-data-table
       title="Registered Customers"
-      [subtitle]="customers.length + ' customer record(s)'"
+      [subtitle]="totalElements + ' customer record(s)'"
       [loading]="loading"
       [empty]="customers.length === 0"
       [errorMessage]="errorMessage"
@@ -112,6 +129,11 @@ import {
         }
       </tbody>
     </app-data-table>
+    <app-pagination
+      [page]="page" [totalPages]="totalPages" [totalElements]="totalElements" [pageSize]="pageSize"
+      (pageChange)="onPageChange($event)" (pageSizeChange)="onPageSizeChange($event)">
+    </app-pagination>
+    }
 
     <app-confirm-dialog
       [visible]="!!customerToDelete"
@@ -128,6 +150,13 @@ import {
 export class CustomerListComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
   private readonly notification = inject(NotificationService);
+  private readonly exportService = inject(ExportService);
+  private readonly settingsService = inject(SettingsService);
+
+  page = 0;
+  pageSize = this.settingsService.settings().pageSize;
+  totalElements = 0;
+  totalPages = 0;
 
   customers: CustomerResponse[] = [];
   searchTerm = '';
@@ -152,9 +181,13 @@ export class CustomerListComponent implements OnInit {
   loadCustomers(): void {
     this.loading = true;
     this.errorMessage = null;
-    this.customerService.getAll(this.searchTerm, this.selectedType).subscribe({
-      next: (data) => {
-        this.customers = data;
+    this.customerService.getPaged(this.page, this.pageSize, this.searchTerm, this.selectedType).subscribe({
+      next: (data: PageResponse<CustomerResponse>) => {
+        this.customers = data.content;
+        this.page = data.page;
+        this.pageSize = data.size;
+        this.totalElements = data.totalElements;
+        this.totalPages = data.totalPages;
         this.loading = false;
       },
       error: (err) => {
@@ -164,9 +197,37 @@ export class CustomerListComponent implements OnInit {
     });
   }
 
+  onPageChange(p: number): void {
+    this.page = p;
+    this.loadCustomers();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize = size;
+    this.settingsService.setPageSize(size);
+    this.page = 0;
+    this.loadCustomers();
+  }
+
+  exportCsv(): void {
+    this.customerService.exportCsv(this.searchTerm, this.selectedType).subscribe({
+      next: (blob) => {
+        this.exportService.downloadBlob(blob, `customers-${new Date().toISOString().slice(0, 10)}.csv`);
+        this.notification.success('Customers CSV downloaded.');
+      },
+      error: (err) => this.notification.error(err?.message || 'Export failed.')
+    });
+  }
+
+  onFilterChange(): void {
+    this.page = 0;
+    this.loadCustomers();
+  }
+
   onReset(): void {
     this.searchTerm = '';
     this.selectedType = '';
+    this.page = 0;
     this.loadCustomers();
   }
 

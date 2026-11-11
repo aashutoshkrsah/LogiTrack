@@ -23,6 +23,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -31,6 +32,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
+@WithMockUser(username = "admin@logitrack.in", roles = "ADMIN")
 class LogisticsEndToEndIntegrationTest {
 
     @Autowired
@@ -236,6 +238,30 @@ class LogisticsEndToEndIntegrationTest {
                 "22 Lake View", "Chennai", today, today.plusDays(2), "5.00");
         mockMvc.perform(delete("/api/shipments/{id}", emptyShipmentId))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void pagedListAndAnalyticsEndpoints() throws Exception {
+        Long customerId = createCustomer("CUST-902", "Paged Test Corp", "+91-98200-33333", "paged@example.com", "CORPORATE");
+        Long hubId = createHub("HUB-903", "Paged Hub", "Mumbai", "Dock Road", "+91-22-4090-3000");
+        createShipment("TRK-PAGED-1", customerId, null, hubId,
+                "1 Test Road", "Pune", LocalDate.now().minusDays(1), LocalDate.now().plusDays(2), "10.00");
+        mockMvc.perform(get("/api/customers").param("page", "0").param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)));
+        mockMvc.perform(get("/api/dashboard/analytics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.daily", hasSize(14)))
+                .andExpect(jsonPath("$.onTimePct").exists());
+        mockMvc.perform(get("/api/dashboard/notifications"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unreadCount").exists());
+        mockMvc.perform(get("/api/shipments/export"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.containsString("trackingNumber")));
     }
 
     private Long createCustomer(String code, String name, String phone, String email, String type) throws Exception {

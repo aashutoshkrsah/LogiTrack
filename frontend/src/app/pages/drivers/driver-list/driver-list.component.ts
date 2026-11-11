@@ -5,9 +5,13 @@ import { RouterLink } from '@angular/router';
 import { AvailabilityStatus, DriverResponse } from '../../../models/driver.model';
 import { DriverService } from '../../../services/driver.service';
 import { NotificationService } from '../../../services/notification.service';
+import { ExportService } from '../../../services/export.service';
+import { SettingsService } from '../../../services/settings.service';
+import { PageResponse } from '../../../models/page.model';
 import {
   ConfirmDialogComponent,
   DataTableComponent,
+  PaginationComponent,
   SearchFilterBarComponent,
   StatusBadgeComponent
 } from '../../../shared/shared-ui';
@@ -22,7 +26,8 @@ import {
     DataTableComponent,
     SearchFilterBarComponent,
     StatusBadgeComponent,
-    ConfirmDialogComponent
+    ConfirmDialogComponent,
+    PaginationComponent
   ],
   template: `
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
@@ -30,20 +35,25 @@ import {
         <h1 class="page-title">Driver Fleet Directory</h1>
         <p class="page-subtitle">Manage delivery personnel, driving licences, and availability statuses</p>
       </div>
-      <a routerLink="/drivers/new" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>Add Driver
-      </a>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportCsv()" [disabled]="loading">
+          <i class="bi bi-download me-1"></i>Export CSV
+        </button>
+        <a routerLink="/drivers/new" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>Add Driver
+        </a>
+      </div>
     </div>
 
     <app-search-filter-bar
       searchLabel="Search Drivers"
       placeholder="Search by code, full name, phone, or licence..."
       [(searchTerm)]="searchTerm"
-      (searchSubmit)="loadDrivers()"
+      (searchSubmit)="onFilterChange()"
       (resetFilters)="onReset()">
       <div class="col-12 col-md-3">
         <label class="form-label small text-muted mb-1">Availability Status</label>
-        <select class="form-select form-select-sm" [(ngModel)]="selectedStatus" (change)="loadDrivers()">
+        <select class="form-select form-select-sm" [(ngModel)]="selectedStatus" (change)="onFilterChange()">
           <option value="">All Statuses</option>
           <option value="AVAILABLE">Available</option>
           <option value="ON_DUTY">On Duty</option>
@@ -53,9 +63,16 @@ import {
       </div>
     </app-search-filter-bar>
 
+    @if (loading) {
+      <div class="ops-card p-3">
+        <div class="skeleton skeleton-row" style="width: 30%;"></div>
+        <div class="skeleton skeleton-row" style="width: 95%;"></div>
+        <div class="skeleton skeleton-row" style="width: 85%;"></div>
+      </div>
+    } @else {
     <app-data-table
       title="Registered Drivers"
-      [subtitle]="drivers.length + ' driver record(s)'"
+      [subtitle]="totalElements + ' driver record(s)'"
       [loading]="loading"
       [empty]="drivers.length === 0"
       [errorMessage]="errorMessage"
@@ -123,6 +140,11 @@ import {
         }
       </tbody>
     </app-data-table>
+    <app-pagination
+      [page]="page" [totalPages]="totalPages" [totalElements]="totalElements" [pageSize]="pageSize"
+      (pageChange)="onPageChange($event)" (pageSizeChange)="onPageSizeChange($event)">
+    </app-pagination>
+    }
 
     <app-confirm-dialog
       [visible]="!!driverToDelete"
@@ -139,6 +161,13 @@ import {
 export class DriverListComponent implements OnInit {
   private readonly driverService = inject(DriverService);
   private readonly notification = inject(NotificationService);
+  private readonly exportService = inject(ExportService);
+  private readonly settingsService = inject(SettingsService);
+
+  page = 0;
+  pageSize = this.settingsService.settings().pageSize;
+  totalElements = 0;
+  totalPages = 0;
 
   readonly statuses: AvailabilityStatus[] = ['AVAILABLE', 'ON_DUTY', 'ON_LEAVE', 'INACTIVE'];
 
@@ -165,9 +194,13 @@ export class DriverListComponent implements OnInit {
   loadDrivers(): void {
     this.loading = true;
     this.errorMessage = null;
-    this.driverService.getAll(this.searchTerm, this.selectedStatus).subscribe({
-      next: (data) => {
-        this.drivers = data;
+    this.driverService.getPaged(this.page, this.pageSize, this.searchTerm, this.selectedStatus).subscribe({
+      next: (data: PageResponse<DriverResponse>) => {
+        this.drivers = data.content;
+        this.page = data.page;
+        this.pageSize = data.size;
+        this.totalElements = data.totalElements;
+        this.totalPages = data.totalPages;
         this.loading = false;
       },
       error: (err) => {
@@ -177,9 +210,37 @@ export class DriverListComponent implements OnInit {
     });
   }
 
+  onPageChange(p: number): void {
+    this.page = p;
+    this.loadDrivers();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize = size;
+    this.settingsService.setPageSize(size);
+    this.page = 0;
+    this.loadDrivers();
+  }
+
+  exportCsv(): void {
+    this.driverService.exportCsv(this.searchTerm, this.selectedStatus).subscribe({
+      next: (blob) => {
+        this.exportService.downloadBlob(blob, `drivers-${new Date().toISOString().slice(0, 10)}.csv`);
+        this.notification.success('Drivers CSV downloaded.');
+      },
+      error: (err) => this.notification.error(err?.message || 'Export failed.')
+    });
+  }
+
+  onFilterChange(): void {
+    this.page = 0;
+    this.loadDrivers();
+  }
+
   onReset(): void {
     this.searchTerm = '';
     this.selectedStatus = '';
+    this.page = 0;
     this.loadDrivers();
   }
 

@@ -38,7 +38,30 @@ public interface TrackingEventRepository extends JpaRepository<TrackingEvent, Lo
 
     List<TrackingEvent> findByShipmentShipmentIdOrderByEventDateTimeDescEventIdDesc(Long shipmentId);
 
+    List<TrackingEvent> findByEventStatusAndEventDateTimeBetween(ShipmentStatus status,
+                                                                 java.time.LocalDateTime from,
+                                                                 java.time.LocalDateTime to);
+
+    List<TrackingEvent> findByShipmentShipmentIdAndEventStatusOrderByEventDateTimeDescEventIdDesc(
+            Long shipmentId, ShipmentStatus status);
+
     Optional<TrackingEvent> findTopByShipmentShipmentIdOrderByEventDateTimeDescEventIdDesc(Long shipmentId);
+
+    @Query("""
+        SELECT e FROM TrackingEvent e
+        JOIN FETCH e.shipment s
+        LEFT JOIN FETCH e.hub h
+        WHERE (:shipmentId IS NULL OR s.shipmentId = :shipmentId)
+          AND (:trackingNumber IS NULL OR :trackingNumber = ''
+               OR LOWER(s.trackingNumber) LIKE LOWER(CONCAT('%', :trackingNumber, '%')))
+          AND (:status IS NULL OR e.eventStatus = :status)
+        ORDER BY e.eventDateTime DESC, e.eventId DESC
+    """)
+    org.springframework.data.domain.Page<TrackingEvent> searchTrackingEventsPaged(
+            @Param("shipmentId") Long shipmentId,
+            @Param("trackingNumber") String trackingNumber,
+            @Param("status") ShipmentStatus status,
+            org.springframework.data.domain.Pageable pageable);
 
     @Query("""
         SELECT e FROM TrackingEvent e

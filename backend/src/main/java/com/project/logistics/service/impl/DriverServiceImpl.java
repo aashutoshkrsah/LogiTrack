@@ -10,7 +10,9 @@ import com.project.logistics.exception.ResourceNotFoundException;
 import com.project.logistics.repository.DriverRepository;
 import com.project.logistics.repository.ShipmentRepository;
 import com.project.logistics.service.DriverService;
+import com.project.logistics.dto.PageResponse;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,20 @@ public class DriverServiceImpl implements DriverService {
                 .map(d -> DtoMapper.toDriverResponse(
                         d, shipmentRepository.countByDriverDriverId(d.getDriverId())))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DriverResponse> getDriversPaged(String search, AvailabilityStatus availabilityStatus, Pageable pageable) {
+        String normalizedSearch = search == null ? null : search.trim();
+        org.springframework.data.domain.Page<com.project.logistics.entity.Driver> page =
+                driverRepository.searchDriversPaged(normalizedSearch, availabilityStatus, pageable);
+        java.util.List<DriverResponse> content = page.getContent().stream()
+                .map(d -> DtoMapper.toDriverResponse(
+                        d, shipmentRepository.countByDriverDriverId(d.getDriverId())))
+                .toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages());
     }
 
     @Override

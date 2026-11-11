@@ -10,7 +10,9 @@ import com.project.logistics.exception.ResourceNotFoundException;
 import com.project.logistics.repository.CustomerRepository;
 import com.project.logistics.repository.ShipmentRepository;
 import com.project.logistics.service.CustomerService;
+import com.project.logistics.dto.PageResponse;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,20 @@ public class CustomerServiceImpl implements CustomerService {
                 .map(c -> DtoMapper.toCustomerResponse(
                         c, shipmentRepository.countByCustomerCustomerId(c.getCustomerId())))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<CustomerResponse> getCustomersPaged(String search, CustomerType customerType, Pageable pageable) {
+        String normalizedSearch = search == null ? null : search.trim();
+        org.springframework.data.domain.Page<com.project.logistics.entity.Customer> page =
+                customerRepository.searchCustomersPaged(normalizedSearch, customerType, pageable);
+        List<CustomerResponse> content = page.getContent().stream()
+                .map(c -> DtoMapper.toCustomerResponse(
+                        c, shipmentRepository.countByCustomerCustomerId(c.getCustomerId())))
+                .toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages());
     }
 
     @Override

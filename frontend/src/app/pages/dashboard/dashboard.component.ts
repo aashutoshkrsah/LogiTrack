@@ -2,10 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { EmptyStateComponent, LoadingSpinnerComponent } from '../../shared/shared-ui';
-import { DashboardSummaryResponse } from '../../models/dashboard.model';
+import { AnalyticsResponse, DashboardSummaryResponse } from '../../models/dashboard.model';
+import { environment } from '../../../environments/environment';
+import { DemoDataService } from '../../services/demo-data.service';
 import { ShipmentStatus } from '../../models/shipment.model';
 import { TrackingEventResponse } from '../../models/tracking-event.model';
 import { DashboardService } from '../../services/dashboard.service';
+import { Observable } from 'rxjs';
 
 interface DonutSegment {
   label: string;
@@ -33,8 +36,20 @@ interface DonutSegment {
       </div>
     }
 
+    @if (demoMode) {
+      <div class="demo-banner mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        <strong>DEMO DATA</strong> — backend unreachable at {{ apiBaseUrl }}. Start the Spring Boot API to see live data.
+      </div>
+    }
+
     @if (loading) {
       <div class="ops-card">
+        <div class="p-3">
+          <div class="skeleton skeleton-row" style="width: 40%;"></div>
+          <div class="skeleton skeleton-row" style="width: 90%;"></div>
+          <div class="skeleton skeleton-row" style="width: 70%;"></div>
+        </div>
         <app-loading-spinner message="Loading live logistics metrics from MySQL..."></app-loading-spinner>
       </div>
     } @else if (summary) {
@@ -149,6 +164,68 @@ interface DonutSegment {
               <i class="bi bi-exclamation-circle me-1"></i>{{ pct(summary.delayedShipmentsCount) }}% overdue
             </div>
           </a>
+        </div>
+      </section>
+
+
+      <!-- 2b. Performance strip: on-time %, trend sparkline, top hubs/drivers -->
+      <section class="row g-3 mb-3">
+        <div class="col-12 col-md-4 col-xl-3">
+          <a routerLink="/analytics" class="stat-tile text-decoration-none">
+            <div class="d-flex align-items-center gap-3">
+              <div class="stat-icon icon-emerald"><i class="bi bi-stopwatch-fill"></i></div>
+              <div class="min-w-0">
+                <div class="stat-num tabular-nums">{{ analytics?.onTimePct ?? '—' }}@if (analytics) { <span class="fs-5">%</span> }</div>
+                <div class="stat-label">On-time delivery</div>
+              </div>
+            </div>
+            <div class="stat-foot text-muted">Avg {{ analytics?.avgDeliveryDays ?? '—' }} days to deliver</div>
+          </a>
+        </div>
+        <div class="col-12 col-md-8 col-xl-5">
+          <div class="dash-card h-100">
+            <div class="dash-card-header">
+              <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Shipments — last 14 days</h6>
+              <a routerLink="/analytics" class="view-all-link">Analytics <i class="bi bi-arrow-right ms-1"></i></a>
+            </div>
+            <div class="dash-card-body py-2">
+              @if (analytics && analytics.daily.length > 0) {
+                <svg viewBox="0 0 300 64" class="w-100" role="img" aria-label="14-day shipment trend sparkline" style="max-height: 64px;">
+                  <polyline [attr.points]="sparklinePoints" fill="none" stroke="#1d72f3" stroke-width="2" />
+                  @for (pt of sparklineDots; track pt) {
+                    <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="2.5" fill="#1d72f3" />
+                  }
+                </svg>
+                <div class="small text-muted">Created per day · peak {{ sparklinePeak }} shipments</div>
+              } @else {
+                <div class="small text-muted py-3">Trend data unavailable — open Analytics for details.</div>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <div class="dash-card h-100">
+            <div class="dash-card-header"><h6 class="mb-0 fw-bold">Top Hubs</h6></div>
+            <div class="dash-card-body py-2 d-flex flex-column gap-1 small">
+              @for (h of (analytics?.hubThroughput ?? []).slice(0, 3); track h.hubCode) {
+                <div class="d-flex justify-content-between"><span class="text-truncate">{{ h.hubName }}</span><strong class="tabular-nums">{{ h.count }}</strong></div>
+              } @empty {
+                <span class="text-muted">No hub data yet.</span>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <div class="dash-card h-100">
+            <div class="dash-card-header"><h6 class="mb-0 fw-bold">Top Drivers</h6></div>
+            <div class="dash-card-body py-2 d-flex flex-column gap-1 small">
+              @for (d of (analytics?.driverLeaderboard ?? []).slice(0, 3); track d.driverCode) {
+                <div class="d-flex justify-content-between"><span class="text-truncate">{{ d.driverName }}</span><strong class="tabular-nums">{{ d.deliveredCount }}</strong></div>
+              } @empty {
+                <span class="text-muted">No driver data yet.</span>
+              }
+            </div>
+          </div>
         </div>
       </section>
 
@@ -742,11 +819,15 @@ interface DonutSegment {
 })
 export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
+  private readonly demoData = inject(DemoDataService);
 
   summary: DashboardSummaryResponse | null = null;
+  analytics: AnalyticsResponse | null = null;
   donutSegments: DonutSegment[] = [];
   loading = true;
   errorMessage: string | null = null;
+  demoMode = false;
+  readonly apiBaseUrl = environment.apiBaseUrl;
 
   ngOnInit(): void {
     this.loadDashboard();
@@ -755,17 +836,60 @@ export class DashboardComponent implements OnInit {
   loadDashboard(): void {
     this.loading = true;
     this.errorMessage = null;
+    this.demoMode = false;
     this.dashboardService.getSummary().subscribe({
       next: (data) => {
         this.summary = data;
         this.buildDonutSegments(data);
         this.loading = false;
+        this.loadAnalytics();
       },
       error: (err) => {
-        this.errorMessage = err.message || 'Failed to load dashboard summary.';
-        this.loading = false;
+        if (err?.status === 0) {
+          // Backend unreachable: show clearly labelled demo data, not an error wall.
+          this.summary = this.demoData.getSummary();
+          this.analytics = this.demoData.getAnalytics();
+          this.buildDonutSegments(this.summary);
+          this.demoMode = true;
+          this.loading = false;
+        } else {
+          this.errorMessage = err.message || 'Failed to load dashboard summary.';
+          this.loading = false;
+        }
       }
     });
+  }
+
+  /** Analytics is best-effort: the endpoint may not exist on older backends. */
+  private loadAnalytics(): void {
+    const svc = this.dashboardService as unknown as Record<string, unknown>;
+    const getAnalytics = svc['getAnalytics'] as (() => Observable<AnalyticsResponse>) | undefined;
+    if (typeof getAnalytics !== 'function') return;
+    getAnalytics.call(this.dashboardService).subscribe({
+      next: (data) => { this.analytics = data; },
+      error: () => { /* keep dashboard usable without analytics */ }
+    });
+  }
+
+  get sparklinePeak(): number {
+    return Math.max(0, ...(this.analytics?.daily ?? []).map((d) => d.created));
+  }
+
+  get sparklinePoints(): string {
+    const daily = this.analytics?.daily ?? [];
+    if (daily.length === 0) return '';
+    const max = Math.max(1, this.sparklinePeak);
+    return daily.map((d, i) => `${(i / Math.max(1, daily.length - 1)) * 290 + 5},${58 - (d.created / max) * 48}`).join(' ');
+  }
+
+  get sparklineDots(): { x: number; y: number }[] {
+    const daily = this.analytics?.daily ?? [];
+    if (daily.length === 0) return [];
+    const max = Math.max(1, this.sparklinePeak);
+    return daily.map((d, i) => ({
+      x: (i / Math.max(1, daily.length - 1)) * 290 + 5,
+      y: 58 - (d.created / max) * 48
+    }));
   }
 
   pct(count: number): number {

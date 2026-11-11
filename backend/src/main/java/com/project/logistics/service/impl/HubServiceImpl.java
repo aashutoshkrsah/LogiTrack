@@ -10,7 +10,9 @@ import com.project.logistics.repository.HubRepository;
 import com.project.logistics.repository.ShipmentRepository;
 import com.project.logistics.repository.TrackingEventRepository;
 import com.project.logistics.service.HubService;
+import com.project.logistics.dto.PageResponse;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,20 @@ public class HubServiceImpl implements HubService {
                 .map(h -> DtoMapper.toHubResponse(
                         h, shipmentRepository.countByOriginHubHubId(h.getHubId())))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<HubResponse> getHubsPaged(String search, String city, Pageable pageable) {
+        String normalizedSearch = search == null ? null : search.trim();
+        org.springframework.data.domain.Page<com.project.logistics.entity.Hub> page =
+                hubRepository.searchHubsPaged(normalizedSearch, city, pageable);
+        java.util.List<HubResponse> content = page.getContent().stream()
+                .map(h -> DtoMapper.toHubResponse(
+                        h, shipmentRepository.countByOriginHubHubId(h.getHubId())))
+                .toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages());
     }
 
     @Override

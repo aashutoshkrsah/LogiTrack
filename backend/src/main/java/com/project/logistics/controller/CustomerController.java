@@ -6,7 +6,14 @@ import com.project.logistics.dto.MessageResponse;
 import com.project.logistics.entity.CustomerType;
 import com.project.logistics.service.CustomerService;
 import jakarta.validation.Valid;
+import com.project.logistics.dto.PageResponse;
+import com.project.logistics.util.CsvUtil;
+import com.project.logistics.util.PaginationUtil;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,10 +37,38 @@ public class CustomerController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CustomerResponse>> getAllCustomers(
+    public ResponseEntity<?> getAllCustomers(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) CustomerType customerType) {
+            @RequestParam(required = false) CustomerType customerType,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        if (page != null) {
+            PageResponse<CustomerResponse> paged = customerService.getCustomersPaged(search, customerType,
+                    PaginationUtil.build(page, size, sort,
+                            Set.of("customerId", "customerCode", "name", "email"), "customerId"));
+            return ResponseEntity.ok(paged);
+        }
         return ResponseEntity.ok(customerService.getAllCustomers(search, customerType));
+    }
+
+    @GetMapping("/export")
+    public void exportCustomers(@RequestParam(required = false) String search,
+                                @RequestParam(required = false) CustomerType customerType,
+                                HttpServletResponse response) throws IOException {
+        List<CustomerResponse> rows = customerService.getAllCustomers(search, customerType);
+        String csv = CsvUtil.build(
+                new String[]{"customerId", "customerCode", "name", "phone", "email", "customerType", "shipmentCount"},
+                rows.stream().map(c -> new String[]{
+                        String.valueOf(c.getCustomerId()), c.getCustomerCode(), c.getName(), c.getPhone(),
+                        c.getEmail(), c.getCustomerType().name(), String.valueOf(c.getShipmentCount())}).toList());
+        writeCsv(response, "customers.csv", csv);
+    }
+
+    private static void writeCsv(HttpServletResponse response, String filename, String csv) throws IOException {
+        response.setContentType("text/csv");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        response.getOutputStream().write(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     @GetMapping("/{id}")

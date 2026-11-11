@@ -14,11 +14,20 @@ import { ShipmentDetailComponent } from './pages/shipments/shipment-detail/shipm
 import { ShipmentFormComponent } from './pages/shipments/shipment-form/shipment-form.component';
 import { ShipmentListComponent } from './pages/shipments/shipment-list/shipment-list.component';
 import { TrackingSearchComponent } from './pages/tracking/tracking-search/tracking-search.component';
+import { LoginComponent } from './pages/auth/login.component';
+import { AnalyticsComponent } from './pages/analytics/analytics.component';
+import { NotificationsComponent } from './pages/notifications/notifications.component';
+import { PublicTrackComponent } from './pages/public-track/public-track.component';
+import { SettingsComponent } from './pages/settings/settings.component';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
+  { path: 'login', component: LoginComponent, data: { title: 'Sign in' } },
+  { path: 'track', component: PublicTrackComponent, data: { title: 'Track a shipment' } },
   {
     path: '',
     component: MainLayoutComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
@@ -110,6 +119,21 @@ export const routes: Routes = [
         path: 'tracking',
         component: TrackingSearchComponent,
         data: { title: 'Track & Timeline Lookup' }
+      },
+      {
+        path: 'analytics',
+        component: AnalyticsComponent,
+        data: { title: 'Analytics' }
+      },
+      {
+        path: 'notifications',
+        component: NotificationsComponent,
+        data: { title: 'Notifications' }
+      },
+      {
+        path: 'settings',
+        component: SettingsComponent,
+        data: { title: 'Settings' }
       }
     ]
   },

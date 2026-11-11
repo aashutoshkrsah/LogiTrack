@@ -152,3 +152,76 @@ Allowed `shipmentStatus`: `PENDING`, `PICKED_UP`, `IN_TRANSIT`, `OUT_FOR_DELIVER
 |---|---|---|---|
 | `GET` | `/api/dashboard/summary` | Fetch all shipment status counts, delayed shipments, distribution, and recent events | `200 OK` |
 
+
+---
+
+## 9. Authentication (`/api/auth`)
+
+Demo users are seeded from environment variables (`APP_AUTH_ADMIN_EMAIL` /
+`APP_AUTH_ADMIN_PASSWORD`, dispatcher, viewer). Passwords are BCrypt-hashed in memory
+at startup. All other `/api/**` endpoints require `Authorization: Bearer <token>`.
+
+| Method | Endpoint | Description | Success Status |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Login with `{email, password}` → `{token, tokenType: "Bearer", email, name, role, expiresInSeconds}` | `200 OK` |
+| `GET` | `/api/auth/me` | Current user `{email, name, role}` (requires token) | `200 OK` |
+
+Demo credentials: `admin@logitrack.in` / `Admin@123` (ADMIN),
+`dispatcher@logitrack.in` / `Dispatch@123` (DISPATCHER),
+`viewer@logitrack.in` / `View@123` (VIEWER). Wrong credentials return `401`.
+
+## 10. Pagination, sorting & search (all list endpoints)
+
+`GET /api/customers`, `/api/drivers`, `/api/hubs`, `/api/shipments`, `/api/tracking-events`
+accept optional `?page=0&size=10&sort=createdDate,desc` (plus each endpoint's existing
+filters). **With `page`:** response is a page object:
+
+```json
+{ "content": [ "..." ], "page": 0, "size": 10, "totalElements": 42, "totalPages": 5 }
+```
+
+**Without `page`:** the original plain JSON array is returned (backward compatible).
+`sort` is `field,asc|desc`; unknown fields fall back to the default sort (ID descending).
+`size` is capped at 100.
+
+## 11. Dashboard analytics & notifications (`/api/dashboard`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/dashboard/analytics` | 14-day daily `{date, created, delivered}`, `onTimePct`, `avgDeliveryDays`, `deliveredCount`, `hubThroughput[]`, `driverLeaderboard[]` (`{driverCode, driverName, deliveredCount, totalCount}`), `statusMix[]` |
+| `GET` | `/api/dashboard/notifications` | `{delayedShipments[], recentEvents[], unreadCount}` |
+
+On-time % = delivered shipments whose proof-of-delivery date is on or before the
+expected delivery date, as a share of all delivered shipments. Average delivery days
+is measured from `createdDate` to the DELIVERED tracking event date.
+
+## 12. Shipment workflow actions (`/api/shipments/{id}`)
+
+| Method | Endpoint | Description | Rules |
+|---|---|---|---|
+| `POST` | `/api/shipments/{id}/assign-driver` | Body `{driverId}` → updated shipment | Rejected `409` for DELIVERED/CANCELLED shipments; INACTIVE drivers rejected |
+| `POST` | `/api/shipments/{id}/advance` | Move to the next legal status, appends a tracking event | PENDING→PICKED_UP→IN_TRANSIT→OUT_FOR_DELIVERY→DELIVERED; `409` if terminal |
+| `POST` | `/api/shipments/{id}/cancel` | Body `{reason?}` → CANCELLED + tracking event | `409` if already DELIVERED or CANCELLED |
+| `POST` | `/api/shipments/{id}/deliver` | Body `{receivedBy, remarks?}` → DELIVERED + proof-of-delivery event | Only from OUT_FOR_DELIVERY (`409` otherwise) |
+
+## 13. CSV export
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/shipments/export` | CSV download; respects the same filters as `GET /api/shipments` |
+| `GET` | `/api/customers/export` | CSV download; respects `search` / `customerType` |
+| `GET` | `/api/drivers/export` | CSV download; respects `search` / `availabilityStatus` |
+
+Response: `Content-Type: text/csv`, `Content-Disposition: attachment`.
+
+## 14. Public tracking (`/api/public`) — no authentication
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/public/track/{trackingNumber}` | Shipment summary + chronological timeline (`{shipment, events}`) |
+
+## 15. Health
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/actuator/health` | `{"status":"UP"}` — public, no authentication |

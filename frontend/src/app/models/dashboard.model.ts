@@ -38,3 +38,44 @@ export interface MessageResponse {
   message: string;
 }
 
+export interface DailyPoint {
+  date: string;
+  created: number;
+  delivered: number;
+}
+
+export interface HubThroughput {
+  hubCode: string;
+  hubName: string;
+  city: string;
+  count: number;
+}
+
+export interface DriverLeaderboardItem {
+  driverCode: string;
+  driverName: string;
+  deliveredCount: number;
+  totalCount: number;
+}
+
+export interface StatusMixItem {
+  status: string;
+  count: number;
+  percentage: number;
+}
+
+export interface AnalyticsResponse {
+  daily: DailyPoint[];
+  onTimePct: number;
+  avgDeliveryDays: number;
+  hubThroughput: HubThroughput[];
+  driverLeaderboard: DriverLeaderboardItem[];
+  statusMix: StatusMixItem[];
+}
+
+export interface NotificationsResponse {
+  delayedShipments: ShipmentResponse[];
+  recentEvents: TrackingEventResponse[];
+  unreadCount: number;
+}
+

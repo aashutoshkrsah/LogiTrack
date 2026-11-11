@@ -5,7 +5,10 @@ import com.project.logistics.dto.HubResponse;
 import com.project.logistics.dto.MessageResponse;
 import com.project.logistics.service.HubService;
 import jakarta.validation.Valid;
+import com.project.logistics.dto.PageResponse;
+import com.project.logistics.util.PaginationUtil;
 import java.util.List;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,9 +32,18 @@ public class HubController {
     }
 
     @GetMapping
-    public ResponseEntity<List<HubResponse>> getAllHubs(
+    public ResponseEntity<?> getAllHubs(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String city) {
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        if (page != null) {
+            PageResponse<HubResponse> paged = hubService.getHubsPaged(search, city,
+                    PaginationUtil.build(page, size, sort,
+                            Set.of("hubId", "hubCode", "hubName", "city"), "hubId"));
+            return ResponseEntity.ok(paged);
+        }
         return ResponseEntity.ok(hubService.getAllHubs(search, city));
     }
 

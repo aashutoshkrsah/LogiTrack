@@ -1,6 +1,8 @@
 package com.project.logistics.controller;
 
+import com.project.logistics.dto.AnalyticsResponse;
 import com.project.logistics.dto.DashboardSummaryResponse;
+import com.project.logistics.dto.NotificationsResponse;
 import com.project.logistics.service.DashboardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +22,16 @@ public class DashboardController {
     @GetMapping("/summary")
     public ResponseEntity<DashboardSummaryResponse> getDashboardSummary() {
         return ResponseEntity.ok(dashboardService.getDashboardSummary());
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<AnalyticsResponse> getAnalytics() {
+        return ResponseEntity.ok(dashboardService.getAnalytics());
+    }
+
+    @GetMapping("/notifications")
+    public ResponseEntity<NotificationsResponse> getNotifications() {
+        return ResponseEntity.ok(dashboardService.getNotifications());
     }
 }
 

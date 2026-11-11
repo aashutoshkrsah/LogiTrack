@@ -22,3 +22,5 @@ backend/src/main/resources/application-local.properties
 *.log
 npm-debug.log*
 
+
+.local-jdk/

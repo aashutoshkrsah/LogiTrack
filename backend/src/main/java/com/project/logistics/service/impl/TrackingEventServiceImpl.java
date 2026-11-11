@@ -12,7 +12,9 @@ import com.project.logistics.repository.HubRepository;
 import com.project.logistics.repository.ShipmentRepository;
 import com.project.logistics.repository.TrackingEventRepository;
 import com.project.logistics.service.TrackingEventService;
+import com.project.logistics.dto.PageResponse;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +45,19 @@ public class TrackingEventServiceImpl implements TrackingEventService {
                 .stream()
                 .map(DtoMapper::toTrackingEventResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<TrackingEventResponse> getTrackingEventsPaged(Long shipmentId, String trackingNumber,
+                                                                      ShipmentStatus status, Pageable pageable) {
+        String normalizedTracking = trackingNumber == null ? null : trackingNumber.trim();
+        org.springframework.data.domain.Page<TrackingEvent> page =
+                trackingEventRepository.searchTrackingEventsPaged(shipmentId, normalizedTracking, status, pageable);
+        java.util.List<TrackingEventResponse> content = page.getContent().stream()
+                .map(DtoMapper::toTrackingEventResponse).toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages());
     }
 
     @Override

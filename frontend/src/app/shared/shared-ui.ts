@@ -7,3 +7,4 @@ export { SearchFilterBarComponent } from '../components/search-filter-bar/search
 export { StatusBadgeComponent } from '../components/status-badge/status-badge.component';
 export { TrackingTimelineComponent } from '../components/tracking-timeline/tracking-timeline.component';
 
+export { PaginationComponent } from '../components/pagination/pagination.component';

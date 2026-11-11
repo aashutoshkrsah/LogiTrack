@@ -79,7 +79,19 @@ INSERT INTO shipments (
 
 -- 7. Pending & OVERDUE (expected 2 days ago, still pending pickup)
 ('TRK-2026-0007', 2, NULL, 4, '12 Park Street', 'Kolkata',
- DATE_SUB(CURDATE(), INTERVAL 6 DAY), DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'PENDING', 42.10);
+ DATE_SUB(CURDATE(), INTERVAL 6 DAY), DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'PENDING', 42.10),
+
+-- 8. Delivered on time, created 13 days ago (widens the 14-day analytics trend)
+('TRK-2026-0008', 3, 2, 3, '8 Residency Road', 'Bengaluru',
+ DATE_SUB(CURDATE(), INTERVAL 13 DAY), DATE_SUB(CURDATE(), INTERVAL 9 DAY), 'DELIVERED', 88.00),
+
+-- 9. In Transit, created 11 days ago
+('TRK-2026-0009', 1, 4, 5, '21 MG Road', 'Hyderabad',
+ DATE_SUB(CURDATE(), INTERVAL 11 DAY), DATE_ADD(CURDATE(), INTERVAL 1 DAY), 'IN_TRANSIT', 54.25),
+
+-- 10. Cancelled, created 10 days ago
+('TRK-2026-0010', 5, NULL, 2, '3 Lake View Road', 'Pune',
+ DATE_SUB(CURDATE(), INTERVAL 10 DAY), DATE_SUB(CURDATE(), INTERVAL 6 DAY), 'CANCELLED', 12.00);
 
 -- -----------------------------------------------------------------------------
 -- TRACKING EVENTS (Chronological milestone records synced with shipment_status)
@@ -114,5 +126,19 @@ INSERT INTO tracking_events (shipment_id, event_date_time, event_status, hub_id,
 (6, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 DAY), '20:30:00'), 'IN_TRANSIT', 1, 'Cross-docked at Mumbai Hub en route to Ahmedabad', 'Operator M. Joshi'),
 
 -- Timeline for TRK-2026-0007 (Pending - Overdue)
-(7, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY), '13:15:00'), 'PENDING', 4, 'Awaiting driver assignment at Delhi NCR Gateway', 'Coordinator S. Gupta');
+(7, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY), '13:15:00'), 'PENDING', 4, 'Awaiting driver assignment at Delhi NCR Gateway', 'Coordinator S. Gupta'),
+
+-- Timeline for TRK-2026-0008 (Delivered on time)
+(8, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '09:00:00'), 'PENDING', 3, 'Registered at Bengaluru Hub', 'Coordinator N. Iyer'),
+(8, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 12 DAY), '10:30:00'), 'PICKED_UP', 3, 'Picked up by Suresh Babu Nair', 'Operator D. Gowda'),
+(8, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '14:00:00'), 'DELIVERED', NULL, 'Delivered on time, signed by receiver', 'Suresh Babu Nair'),
+
+-- Timeline for TRK-2026-0009 (In Transit)
+(9, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 11 DAY), '08:45:00'), 'PENDING', 5, 'Registered at Hyderabad Terminal', 'Coordinator S. Gupta'),
+(9, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '12:00:00'), 'PICKED_UP', 5, 'Picked up by Prakash Patel', 'Operator R. Meena'),
+(9, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 9 DAY), '18:20:00'), 'IN_TRANSIT', 1, 'Line-haul departed for Hyderabad', 'Hub Lead P. Reddy'),
+
+-- Timeline for TRK-2026-0010 (Cancelled)
+(10, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '11:00:00'), 'PENDING', 2, 'Registered at Pune Hub', 'Coordinator A. Rao'),
+(10, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 9 DAY), '09:30:00'), 'CANCELLED', 2, 'Cancelled at customer request before pickup', 'Coordinator A. Rao');
 

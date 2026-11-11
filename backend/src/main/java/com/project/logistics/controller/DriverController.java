@@ -6,8 +6,15 @@ import com.project.logistics.dto.MessageResponse;
 import com.project.logistics.entity.AvailabilityStatus;
 import com.project.logistics.service.DriverService;
 import jakarta.validation.Valid;
+import com.project.logistics.dto.PageResponse;
+import com.project.logistics.util.CsvUtil;
+import com.project.logistics.util.PaginationUtil;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,11 +39,41 @@ public class DriverController {
     }
 
     @GetMapping
-    public ResponseEntity<List<DriverResponse>> getAllDrivers(
+    public ResponseEntity<?> getAllDrivers(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) AvailabilityStatus availabilityStatus) {
+            @RequestParam(required = false) AvailabilityStatus availabilityStatus,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        if (page != null) {
+            PageResponse<DriverResponse> paged = driverService.getDriversPaged(search, availabilityStatus,
+                    PaginationUtil.build(page, size, sort,
+                            Set.of("driverId", "driverCode", "fullName"), "driverId"));
+            return ResponseEntity.ok(paged);
+        }
         return ResponseEntity.ok(driverService.getAllDrivers(search, availabilityStatus));
     }
+
+    @GetMapping("/export")
+    public void exportDrivers(@RequestParam(required = false) String search,
+                              @RequestParam(required = false) AvailabilityStatus availabilityStatus,
+                              HttpServletResponse response) throws IOException {
+        List<DriverResponse> rows = driverService.getAllDrivers(search, availabilityStatus);
+        String csv = CsvUtil.build(
+                new String[]{"driverId", "driverCode", "fullName", "phone", "licenceNumber", "availabilityStatus", "shipmentCount"},
+                rows.stream().map(d -> new String[]{
+                        String.valueOf(d.getDriverId()), d.getDriverCode(), d.getFullName(), d.getPhone(),
+                        d.getLicenceNumber(), d.getAvailabilityStatus().name(),
+                        String.valueOf(d.getShipmentCount())}).toList());
+        writeCsv(response, "drivers.csv", csv);
+    }
+
+    private static void writeCsv(HttpServletResponse response, String filename, String csv) throws IOException {
+        response.setContentType("text/csv");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        response.getOutputStream().write(csv.getBytes(StandardCharsets.UTF_8));
+    }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<DriverResponse> getDriverById(@PathVariable Long id) {

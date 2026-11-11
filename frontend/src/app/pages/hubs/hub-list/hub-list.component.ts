@@ -5,9 +5,13 @@ import { RouterLink } from '@angular/router';
 import { HubResponse } from '../../../models/hub.model';
 import { HubService } from '../../../services/hub.service';
 import { NotificationService } from '../../../services/notification.service';
+import { ExportService } from '../../../services/export.service';
+import { SettingsService } from '../../../services/settings.service';
+import { PageResponse } from '../../../models/page.model';
 import {
   ConfirmDialogComponent,
   DataTableComponent,
+  PaginationComponent,
   SearchFilterBarComponent
 } from '../../../shared/shared-ui';
 
@@ -20,7 +24,8 @@ import {
     RouterLink,
     DataTableComponent,
     SearchFilterBarComponent,
-    ConfirmDialogComponent
+    ConfirmDialogComponent,
+    PaginationComponent
   ],
   template: `
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
@@ -28,16 +33,21 @@ import {
         <h1 class="page-title">Logistics Hub Directory</h1>
         <p class="page-subtitle">Manage regional sorting centers, origin terminals, and transit hubs</p>
       </div>
-      <a routerLink="/hubs/new" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>Add Hub
-      </a>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportCsv()" [disabled]="loading">
+          <i class="bi bi-download me-1"></i>Export CSV
+        </button>
+        <a routerLink="/hubs/new" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>Add Hub
+        </a>
+      </div>
     </div>
 
     <app-search-filter-bar
       searchLabel="Search Hubs"
       placeholder="Search by hub code, name, city, or address..."
       [(searchTerm)]="searchTerm"
-      (searchSubmit)="loadHubs()"
+      (searchSubmit)="onFilterChange()"
       (resetFilters)="onReset()">
       <div class="col-12 col-md-3">
         <label class="form-label small text-muted mb-1">Filter by City</label>
@@ -46,13 +56,20 @@ import {
           class="form-control form-control-sm"
           placeholder="e.g. Mumbai, Pune..."
           [(ngModel)]="cityFilter"
-          (keyup.enter)="loadHubs()" />
+          (keyup.enter)="onFilterChange()" />
       </div>
     </app-search-filter-bar>
 
+    @if (loading) {
+      <div class="ops-card p-3">
+        <div class="skeleton skeleton-row" style="width: 30%;"></div>
+        <div class="skeleton skeleton-row" style="width: 95%;"></div>
+        <div class="skeleton skeleton-row" style="width: 85%;"></div>
+      </div>
+    } @else {
     <app-data-table
       title="Delivery &amp; Transit Hubs"
-      [subtitle]="hubs.length + ' hub facility(ies)'"
+      [subtitle]="totalElements + ' hub facility(ies)'"
       [loading]="loading"
       [empty]="hubs.length === 0"
       [errorMessage]="errorMessage"
@@ -105,6 +122,11 @@ import {
         }
       </tbody>
     </app-data-table>
+    <app-pagination
+      [page]="page" [totalPages]="totalPages" [totalElements]="totalElements" [pageSize]="pageSize"
+      (pageChange)="onPageChange($event)" (pageSizeChange)="onPageSizeChange($event)">
+    </app-pagination>
+    }
 
     <app-confirm-dialog
       [visible]="!!hubToDelete"
@@ -121,6 +143,13 @@ import {
 export class HubListComponent implements OnInit {
   private readonly hubService = inject(HubService);
   private readonly notification = inject(NotificationService);
+  private readonly exportService = inject(ExportService);
+  private readonly settingsService = inject(SettingsService);
+
+  page = 0;
+  pageSize = this.settingsService.settings().pageSize;
+  totalElements = 0;
+  totalPages = 0;
 
   hubs: HubResponse[] = [];
   searchTerm = '';
@@ -142,9 +171,13 @@ export class HubListComponent implements OnInit {
   loadHubs(): void {
     this.loading = true;
     this.errorMessage = null;
-    this.hubService.getAll(this.searchTerm, this.cityFilter).subscribe({
-      next: (data) => {
-        this.hubs = data;
+    this.hubService.getPaged(this.page, this.pageSize, this.searchTerm, this.cityFilter).subscribe({
+      next: (data: PageResponse<HubResponse>) => {
+        this.hubs = data.content;
+        this.page = data.page;
+        this.pageSize = data.size;
+        this.totalElements = data.totalElements;
+        this.totalPages = data.totalPages;
         this.loading = false;
       },
       error: (err) => {
@@ -154,9 +187,37 @@ export class HubListComponent implements OnInit {
     });
   }
 
+  onPageChange(p: number): void {
+    this.page = p;
+    this.loadHubs();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize = size;
+    this.settingsService.setPageSize(size);
+    this.page = 0;
+    this.loadHubs();
+  }
+
+  exportCsv(): void {
+    this.hubService.exportCsv(this.searchTerm, this.cityFilter).subscribe({
+      next: (blob) => {
+        this.exportService.downloadBlob(blob, `hubs-${new Date().toISOString().slice(0, 10)}.csv`);
+        this.notification.success('Hubs CSV downloaded.');
+      },
+      error: (err) => this.notification.error(err?.message || 'Export failed.')
+    });
+  }
+
+  onFilterChange(): void {
+    this.page = 0;
+    this.loadHubs();
+  }
+
   onReset(): void {
     this.searchTerm = '';
     this.cityFilter = '';
+    this.page = 0;
     this.loadHubs();
   }
 

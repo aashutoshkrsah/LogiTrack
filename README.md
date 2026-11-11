@@ -24,6 +24,54 @@
 
 ---
 
+## 1a. What's new — professional rebuild (November 2026)
+
+- **Professional UI**: light + dark mode, grouped collapsible sidebar, global search,
+  notifications centre, redesigned dashboard (on-time %, 14-day trend, top hubs/drivers).
+- **Login**: JWT auth with demo accounts (see below); every `/api/**` endpoint except
+  `/api/auth/**`, `/api/public/**` and `/actuator/health` requires a Bearer token.
+- **Analytics page** (`/analytics`): 14-day trend, status mix, hub throughput, driver
+  leaderboard, on-time delivery %. **Notifications page** (`/notifications`): delayed
+  shipments + recent events. **Settings page** (`/settings`): theme, density, page size.
+- **Public tracking** (`/track`): anyone can track a shipment by number — no login.
+- **One-click shipment workflow**: assign driver, advance to the next status, cancel,
+  mark delivered with proof of delivery — each appends a tracking event.
+- **Pagination, sorting & CSV export** on all list endpoints (paged shape only when
+  `?page=` is supplied; otherwise the original array is returned).
+- **Docker**: `docker compose up --build` runs MySQL + backend + frontend with healthchecks.
+- **Demo mode**: if the backend is unreachable, the UI shows clearly labelled DEMO DATA
+  instead of pretending to be live. Full list: `CHANGELOG_PRO.md`.
+
+### Demo login
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@logitrack.in` | `Admin@123` |
+| Dispatcher | `dispatcher@logitrack.in` | `Dispatch@123` |
+| Viewer (read-only UI) | `viewer@logitrack.in` | `View@123` |
+
+Change the passwords and `JWT_SECRET` via environment variables (`.env.example`) before
+any real deployment — the defaults are demo-only.
+
+### Quick start
+
+```bash
+# Option A — Docker (recommended)
+cp .env.example .env   # edit DB_PASSWORD / JWT_SECRET
+docker compose up --build
+# Frontend http://localhost:4200 · Backend http://localhost:8080/api
+
+# Option B — local (JDK 21, Maven 3.9+, Node 20+, MySQL 8 with logistics_db)
+bash scripts/run-all.sh            # Linux/macOS
+# powershell -ExecutionPolicy Bypass -File scripts\run-all.ps1   # Windows
+```
+
+> Frontend dev server proxies `/api/*` to `http://localhost:8080` (`proxy.conf.json`).
+> The production Docker image serves the Angular build with nginx and proxies `/api/`
+> to the `backend` container.
+
+---
+
 ## 2. Problem Statement
 
 Logistics operations teams frequently rely on disconnected spreadsheets to track consignments, customer records, assigned fleet drivers, hub handoffs, and delivery milestones. Manual spreadsheet workflows make it difficult to:
@@ -56,8 +104,13 @@ LogiTrack replaces fragmented manual spreadsheets with a strongly typed Angular 
 - Complete REST API integration over JSON/HTTP using Angular `HttpClient`, `ReactiveForms`, and `Angular Router`.
 
 ### Strict Scope Exclusions
-- **No GPS / live vehicle telemetry**, **no route optimization**, **no customer SMS notifications**, and **no authentication/authorization layer** (excluded per assignment specification).
+- **No GPS / live vehicle telemetry**, **no route optimization**, and **no customer SMS notifications**.
+- Authentication **is** included since the November 2026 professional rebuild: JWT login
+  (`POST /api/auth/login`) with ADMIN / DISPATCHER / VIEWER demo users; see
+  [Demo login](#demo-login) and `CHANGELOG_PRO.md`.
 - **No additional persistent main entities** beyond `Customer`, `Driver`, `Hub`, `Shipment`, and `TrackingEvent` (destination addresses remain on `Shipment`).
+- **No GPS / live vehicle telemetry, no SMS/email notifications, no payments** — see
+  `CHANGELOG_PRO.md` for the full "still not included" list.
 
 ---
 

@@ -6,7 +6,10 @@ import com.project.logistics.dto.TrackingEventResponse;
 import com.project.logistics.entity.ShipmentStatus;
 import com.project.logistics.service.TrackingEventService;
 import jakarta.validation.Valid;
+import com.project.logistics.dto.PageResponse;
+import com.project.logistics.util.PaginationUtil;
 import java.util.List;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,10 +33,20 @@ public class TrackingEventController {
     }
 
     @GetMapping
-    public ResponseEntity<List<TrackingEventResponse>> getAllTrackingEvents(
+    public ResponseEntity<?> getAllTrackingEvents(
             @RequestParam(required = false) Long shipmentId,
             @RequestParam(required = false) String trackingNumber,
-            @RequestParam(required = false) ShipmentStatus status) {
+            @RequestParam(required = false) ShipmentStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        if (page != null) {
+            PageResponse<TrackingEventResponse> paged = trackingEventService.getTrackingEventsPaged(
+                    shipmentId, trackingNumber, status,
+                    PaginationUtil.build(page, size, sort,
+                            Set.of("eventId", "eventDateTime", "eventStatus"), "eventDateTime"));
+            return ResponseEntity.ok(paged);
+        }
         return ResponseEntity.ok(
                 trackingEventService.getAllTrackingEvents(shipmentId, trackingNumber, status));
     }

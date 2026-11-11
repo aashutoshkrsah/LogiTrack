@@ -1,7 +1,7 @@
 # CHANGELOG — Professional Rebuild (2026-11-11)
 
 Rebuild of LogiTrack (Angular 19 + Spring Boot 3.4.5 + MySQL 8) in `~/workspace/logitrack`.
-Nothing was pushed to GitHub. All pre-existing `/api/*` endpoints keep working with the
+Pushed to GitHub `main` on 2026-11-11 as commit `37d1081ebf028ffad16ebdc7ad3f7268f4a84775`. All pre-existing `/api/*` endpoints keep working with the
 same shapes; new capabilities are additive (see "Compatibility" below).
 
 ## What changed
